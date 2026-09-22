@@ -11,3 +11,7 @@ __pycache__/
 # OS
 .DS_Store
 Thumbs.db
+
+# Kubernetes Secrets
+k8s/*.yaml
+!k8s/*.example.yaml

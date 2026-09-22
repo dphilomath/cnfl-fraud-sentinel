@@ -2,9 +2,13 @@
 
 A real-time fraud detection pipeline built with **Confluent Cloud** for the DevDay AI Challenge.
 
-![Architecture](https://img.shields.io/badge/Confluent_Cloud-Powered-blue?style=for-the-badge)
-![Python](https://img.shields.io/badge/Python-3.9+-green?style=for-the-badge)
-![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-https%3A%2F%2Fopssynergy.isroot.in%2Ffraud%2F-emerald?style=for-the-badge&logo=google-cloud)](https://opssynergy.isroot.in/fraud/)
+![Confluent Cloud](https://img.shields.io/badge/Confluent_Cloud-Powered-blue?style=for-the-badge)
+![Python](https://img.shields.io/badge/Python-3.11+-green?style=for-the-badge)
+![Kubernetes](https://img.shields.io/badge/Kubernetes-Minikube%20on%20GCP-326CE5?style=for-the-badge&logo=kubernetes)
+
+> 🌐 **Live Public Deployment**: **[https://opssynergy.isroot.in/fraud/](https://opssynergy.isroot.in/fraud/)**  
+> Stream processing running live on **Confluent Cloud** (Kafka, Schema Registry, Flink SQL) with sub-2ms **ML fraud scoring** and **AI forensic intelligence briefings**.
 
 ## 🏗️ Architecture
 
