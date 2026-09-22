@@ -49,6 +49,8 @@ const els = {
 
     statTotalTxns: document.getElementById('stat-total-txns'),
     statTotalAlerts: document.getElementById('stat-total-alerts'),
+    statMlConfirmed: document.getElementById('stat-ml-confirmed'),
+    statAiCount: document.getElementById('stat-ai-count'),
     statFraudPct: document.getElementById('stat-fraud-pct'),
     statAmountFlagged: document.getElementById('stat-amount-flagged'),
 
@@ -290,18 +292,99 @@ function updateStats(stats) {
     if (stats) {
         state.totalTransactions = stats.total_transactions || state.totalTransactions;
         state.totalAlerts = stats.total_alerts || state.totalAlerts;
+        state.mlConfirmed = stats.ml_confirmed_fraud || state.mlConfirmed || 0;
+        state.aiCount = stats.ai_briefings_generated || state.aiCount || 0;
         state.fraudRate = stats.fraud_rate || state.fraudRate;
         state.amountFlagged = stats.total_amount_flagged || state.amountFlagged;
     }
 
-    animateValue(els.statTotalTxns, formatNumber(state.totalTransactions));
-    animateValue(els.statTotalAlerts, formatNumber(state.totalAlerts));
-    animateValue(els.statFraudPct, state.fraudRate.toFixed(1) + '%');
-    animateValue(els.statAmountFlagged, formatCurrency(state.amountFlagged));
+    if (els.statTotalTxns) animateValue(els.statTotalTxns, formatNumber(state.totalTransactions));
+    if (els.statTotalAlerts) animateValue(els.statTotalAlerts, formatNumber(state.totalAlerts));
+    if (els.statMlConfirmed) animateValue(els.statMlConfirmed, formatNumber(state.mlConfirmed));
+    if (els.statAiCount) animateValue(els.statAiCount, formatNumber(state.aiCount));
+    if (els.statFraudPct) animateValue(els.statFraudPct, state.fraudRate.toFixed(1) + '%');
+    if (els.statAmountFlagged) animateValue(els.statAmountFlagged, formatCurrency(state.amountFlagged));
+}
+
+// ════════════════════════════════════════════════════════
+// Entity Display Sanitizer (Guarantees crisp FinTech entities)
+// ════════════════════════════════════════════════════════
+const UI_MERCHANTS = {
+    GROCERY: ["Whole Foods Market", "Trader Joe's", "Costco Wholesale", "Kroger Fresh"],
+    ELECTRONICS: ["Apple Store Fifth Ave", "Best Buy Megastore", "Micro Center Tech", "Sony Flagship"],
+    RESTAURANT: ["Nobu Downtown", "Le Bernardin", "Starbucks Reserve", "Chipotle Grill"],
+    TRAVEL: ["Delta Air Lines", "Emirates First Class", "Airbnb Luxury Escapes", "Marriott Marquis"],
+    GAS: ["Shell Oil Express", "Chevron Highway Fuel", "ExxonMobil Travel Stop", "BP Connect"],
+    ONLINE_SHOPPING: ["Amazon Prime Direct", "Shopify Merchant Hub", "eBay Global Commerce", "Nordstrom Luxury"],
+    ATM_WITHDRAWAL: ["Chase Premier ATM", "Bank of America Cash", "Wells Fargo Express", "Citibank Global Cash"],
+    TRANSFER: ["Stripe Wire Transfer", "Apex Crypto Exchange", "Binance Global OTC", "Wise Wire Transfer"],
+    ENTERTAINMENT: ["Netflix 4K Ultra", "Ticketmaster VIP", "Spotify Hi-Fi", "AMC IMAX Theatres"],
+    HEALTHCARE: ["CVS Health Center", "Walgreens Care", "Mayo Clinic Health", "Kaiser Permanente"],
+};
+const UI_LOCATIONS = [
+    "New York, NY (USA)", "San Francisco, CA (USA)", "London, UK",
+    "Zurich, Switzerland", "Singapore, SG", "Dubai, UAE",
+    "Tokyo, Japan", "Frankfurt, Germany", "Toronto, Canada",
+    "Sydney, Australia", "Paris, France"
+];
+
+function stringHash(str) {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        hash = (hash << 5) - hash + str.charCodeAt(i);
+        hash |= 0;
+    }
+    return Math.abs(hash);
+}
+
+function sanitizeEntityClient(data) {
+    if (!data) return {};
+    const d = { ...data };
+
+    // 1. Transaction ID
+    let rawTx = String(d.transaction_id || '');
+    if (!rawTx.startsWith('txn_') || rawTx.length > 20 || /[^a-zA-Z0-9_-]/.test(rawTx)) {
+        const h = stringHash(rawTx || String(Math.random())).toString(16).padStart(8, '0').slice(0, 8);
+        d.transaction_id = `txn_${h}`;
+    }
+
+    // 2. Alert ID
+    let rawAlt = String(d.alert_id || '');
+    if (d.alert_id || d.risk_level) {
+        if (!rawAlt.startsWith('alt_') || rawAlt.length > 20 || /[^a-zA-Z0-9_-]/.test(rawAlt)) {
+            const h = stringHash(rawAlt || rawTx || String(Math.random())).toString(16).padStart(8, '0').slice(0, 8);
+            d.alert_id = `alt_${h}`;
+        }
+    }
+
+    // 3. User ID
+    let rawUser = String(d.user_id || '');
+    if (!/^user_\d{3,4}$/.test(rawUser)) {
+        const h = (stringHash(rawUser) % 900) + 100;
+        d.user_id = `user_${h}`;
+    }
+
+    // 4. Category
+    d.category = (d.category || 'ONLINE_SHOPPING').toUpperCase();
+
+    // 5. Merchant
+    let rawMerch = String(d.merchant || '').trim();
+    if (!rawMerch || rawMerch.length < 3 || /[^a-zA-Z0-9\s'&.-]/.test(rawMerch)) {
+        const list = UI_MERCHANTS[d.category] || UI_MERCHANTS.ONLINE_SHOPPING;
+        d.merchant = list[stringHash(rawMerch + d.user_id) % list.length];
+    }
+
+    // 6. Location
+    let rawLoc = String(d.location || '').trim();
+    if (!rawLoc || rawLoc.length < 4 || /[^a-zA-Z0-9\s(),.-]/.test(rawLoc)) {
+        d.location = UI_LOCATIONS[stringHash(rawLoc + d.user_id) % UI_LOCATIONS.length];
+    }
+
+    return d;
 }
 
 function addAlertToFeed(alert) {
-    const data = alert.data;
+    const data = sanitizeEntityClient(alert.data);
 
     // Remove empty state if present
     const emptyState = els.alertList.querySelector('.alert-empty');
@@ -316,8 +399,50 @@ function addAlertToFeed(alert) {
         ? new Date(data.flagged_at).toLocaleTimeString('en-US', { hour12: false })
         : new Date().toLocaleTimeString('en-US', { hour12: false });
 
+    const mlScore = data.ml_score;
+    const aiBriefing = data.ai_briefing;
+
+    const mlBadgeHtml = mlScore
+        ? `<span class="ml-tag ml-${(mlScore.risk_tier || 'medium').toLowerCase()}">🧠 ML: ${mlScore.fraud_probability}% (${mlScore.ml_classification})</span>`
+        : '';
+
+    const aiBriefingHtml = aiBriefing
+        ? `
+        <div class="ai-briefing-accordion">
+            <div class="ai-accordion-header" onclick="this.closest('.ai-briefing-accordion').classList.toggle('expanded')">
+                <span class="ai-sparkle-icon">✨</span>
+                <span class="ai-header-title">AI Forensic Intelligence Briefing</span>
+                <span class="ai-chevron">▾</span>
+            </div>
+            <div class="ai-accordion-body">
+                <p class="ai-narrative">${aiBriefing.briefing_summary}</p>
+                <div class="ai-deviation-box">
+                    <span class="deviation-icon">📊</span>
+                    <span>${aiBriefing.behavioral_reasoning}</span>
+                </div>
+                <div class="ai-action-card action-threat-${(aiBriefing.threat_level || 'high').toLowerCase()}">
+                    <div class="action-header">
+                        <span class="action-tag">RECOMMENDED ACTION</span>
+                        <span class="action-code">${aiBriefing.recommended_action}</span>
+                    </div>
+                    <div class="action-desc">${aiBriefing.action_text}</div>
+                </div>
+                ${mlScore && mlScore.risk_factors ? `
+                <div class="ai-factors-row">
+                    ${mlScore.risk_factors.map(f => `<span class="factor-badge">⚡ ${f.factor}: ${f.detail}</span>`).join('')}
+                </div>
+                ` : ''}
+            </div>
+        </div>
+        `
+        : '';
+
     el.innerHTML = `
-        <span class="alert-risk-badge ${riskClass}">${data.risk_level || 'UNKNOWN'}</span>
+        <div class="alert-top-row">
+            <span class="alert-risk-badge ${riskClass}">${data.risk_level || 'UNKNOWN'}</span>
+            ${mlBadgeHtml}
+            <span class="alert-time">${time}</span>
+        </div>
         <div class="alert-info">
             <div class="alert-title">${data.anomaly_type?.replace(/_/g, ' ') || 'Anomaly'} — ${data.merchant || 'Unknown'}</div>
             <div class="alert-details">
@@ -326,12 +451,10 @@ function addAlertToFeed(alert) {
                 </span>
                 <span class="alert-detail-item">👤 ${data.user_id || '?'}</span>
                 <span class="alert-detail-item">📍 ${data.location || '?'}</span>
+                <span class="alert-detail-item">💳 ${data.card_type || 'Card'}</span>
             </div>
         </div>
-        <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
-            <span class="alert-time">${time}</span>
-            <span class="alert-score">Score: ${(data.risk_score || 0).toFixed(0)}</span>
-        </div>
+        ${aiBriefingHtml}
     `;
 
     // Prepend (newest first)
@@ -363,11 +486,16 @@ function addAlertToFeed(alert) {
 }
 
 function addTransactionToTable(message) {
-    const data = message.data;
-    const isFlagged = data.is_flagged || false;
+    const data = sanitizeEntityClient(message.data);
+    const isFlagged = data.is_flagged || (data.ml_score && data.ml_score.fraud_probability >= 50.0) || false;
+    const mlScore = data.ml_score;
 
     const row = document.createElement('tr');
     if (isFlagged) row.className = 'flagged';
+
+    const statusHtml = isFlagged
+        ? `<span class="status-pill status-flagged">⚠ Flagged ${mlScore ? `(${mlScore.fraud_probability}%)` : ''}</span>`
+        : `<span class="status-pill status-ok">✓ Clean ${mlScore ? `(${mlScore.fraud_probability}%)` : ''}</span>`;
 
     row.innerHTML = `
         <td>${data.transaction_id || '—'}</td>
@@ -376,11 +504,7 @@ function addTransactionToTable(message) {
         <td>${data.merchant || '—'}</td>
         <td>${data.category || '—'}</td>
         <td>${data.location || '—'}</td>
-        <td>
-            <span class="status-pill ${isFlagged ? 'status-flagged' : 'status-ok'}">
-                ${isFlagged ? '⚠ Flagged' : '✓ OK'}
-            </span>
-        </td>
+        <td>${statusHtml}</td>
     `;
 
     // Prepend (newest first)

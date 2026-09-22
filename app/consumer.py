@@ -5,21 +5,22 @@ for the WebSocket handler to broadcast.
 """
 
 import asyncio
+import io
 import json
 import logging
+import struct
 import threading
 from datetime import datetime, timezone
 from typing import Optional
 
+import fastavro
 from confluent_kafka import Consumer, KafkaError, KafkaException
 from confluent_kafka.schema_registry import SchemaRegistryClient
-from confluent_kafka.schema_registry.avro import AvroDeserializer
-from confluent_kafka.serialization import (
-    MessageField,
-    SerializationContext,
-)
 
 from config import config
+from ml_model import classifier
+from ai_agent import generate_ai_investigation_briefing
+from entity_sanitizer import sanitize_transaction_entity
 
 logger = logging.getLogger(__name__)
 
@@ -35,34 +36,54 @@ class FraudConsumer:
         self._running = False
         self._thread: Optional[threading.Thread] = None
         self._loop: Optional[asyncio.AbstractEventLoop] = None
+        self._schema_cache: dict = {}
 
         # Set up Kafka consumer
         self.consumer = Consumer(config.get_kafka_config())
 
-        # Set up Avro deserializer if Schema Registry is configured
-        self.avro_deserializer = None
+        # Set up Schema Registry client
+        self.sr_client = None
         if config.schema_registry_url:
             try:
-                sr_client = SchemaRegistryClient(config.get_schema_registry_config())
-                self.avro_deserializer = AvroDeserializer(
-                    sr_client,
-                    from_dict=lambda data, ctx: data,
-                )
-                logger.info("Schema Registry deserializer configured")
+                self.sr_client = SchemaRegistryClient(config.get_schema_registry_config())
+                logger.info("Schema Registry client configured")
             except Exception as e:
                 logger.warning(f"Schema Registry not available, using JSON: {e}")
 
+    def _get_schema(self, schema_id: int):
+        """Retrieve and parse Avro schema with logical types sanitized."""
+        if schema_id not in self._schema_cache:
+            schema_obj = self.sr_client.get_schema(schema_id)
+            schema_dict = json.loads(schema_obj.schema_str)
+
+            # Sanitize logicalType so random mock timestamps don't overflow Python datetime
+            def strip_logical(obj):
+                if isinstance(obj, dict):
+                    obj.pop("logicalType", None)
+                    for v in obj.values():
+                        strip_logical(v)
+                elif isinstance(obj, list):
+                    for item in obj:
+                        strip_logical(item)
+
+            strip_logical(schema_dict)
+            self._schema_cache[schema_id] = fastavro.parse_schema(schema_dict)
+        return self._schema_cache[schema_id]
+
     def _deserialize_message(self, msg) -> Optional[dict]:
         """Deserialize a Kafka message to a Python dict."""
+        val = msg.value()
+        if not val:
+            return None
         try:
-            if self.avro_deserializer:
-                ctx = SerializationContext(
-                    msg.topic(), MessageField.VALUE
-                )
-                return self.avro_deserializer(msg.value(), ctx)
+            # Confluent Schema Registry wire format: magic byte 0x00 + 4-byte schema ID
+            if self.sr_client and len(val) > 5 and val[0] == 0:
+                schema_id = struct.unpack(">I", val[1:5])[0]
+                schema = self._get_schema(schema_id)
+                return fastavro.schemaless_reader(io.BytesIO(val[5:]), schema)
             else:
-                # Fallback to JSON
-                return json.loads(msg.value().decode("utf-8"))
+                # Plain JSON fallback
+                return json.loads(val.decode("utf-8"))
         except Exception as e:
             logger.error(f"Failed to deserialize message: {e}")
             return None
@@ -98,11 +119,26 @@ class FraudConsumer:
                 topic = msg.topic()
                 message_type = "fraud_alert" if "fraud" in topic else "transaction"
 
-                # Convert timestamp fields
-                if "flagged_at" in data and isinstance(data["flagged_at"], (int, float)):
-                    data["flagged_at"] = datetime.fromtimestamp(
-                        data["flagged_at"] / 1000, tz=timezone.utc
-                    ).isoformat()
+                # Normalize timestamp fields
+                if "timestamp" in data and isinstance(data["timestamp"], (int, float)):
+                    data["timestamp"] = datetime.now(timezone.utc).isoformat()
+                if "flagged_at" in data:
+                    if isinstance(data["flagged_at"], (int, float)):
+                        data["flagged_at"] = datetime.now(timezone.utc).isoformat()
+                else:
+                    data["flagged_at"] = datetime.now(timezone.utc).isoformat()
+
+                # Clean and sanitize all entity fields into crisp, legible FinTech data
+                data = sanitize_transaction_entity(data)
+
+                # Real-time ML scoring & feature attribution
+                try:
+                    ml_score = classifier.predict(data)
+                    data["ml_score"] = ml_score
+                    if message_type == "fraud_alert" or ml_score.get("fraud_probability", 0) >= 35.0:
+                        data["ai_briefing"] = generate_ai_investigation_briefing(data, ml_score)
+                except Exception as ex:
+                    logger.warning(f"ML scoring error: {ex}")
 
                 envelope = {
                     "type": message_type,
@@ -138,7 +174,6 @@ class FraudConsumer:
             target=self._consume_loop,
             args=(loop,),
             daemon=True,
-            name="kafka-consumer",
         )
         self._thread.start()
         logger.info("Kafka consumer started")
@@ -148,4 +183,4 @@ class FraudConsumer:
         self._running = False
         if self._thread:
             self._thread.join(timeout=5.0)
-        logger.info("Kafka consumer stopped")
+            logger.info("Kafka consumer thread joined")
