@@ -1,0 +1,74 @@
+{
+  "type": "record",
+  "name": "Transaction",
+  "namespace": "io.confluent.devday.fraud",
+  "fields": [
+    {
+      "name": "transaction_id",
+      "type": "string",
+      "doc": "Unique identifier for the transaction"
+    },
+    {
+      "name": "user_id",
+      "type": "string",
+      "doc": "Unique identifier for the user"
+    },
+    {
+      "name": "amount",
+      "type": "double",
+      "doc": "Transaction amount in USD"
+    },
+    {
+      "name": "merchant",
+      "type": "string",
+      "doc": "Merchant name"
+    },
+    {
+      "name": "category",
+      "type": {
+        "type": "enum",
+        "name": "TransactionCategory",
+        "symbols": [
+          "GROCERY",
+          "ELECTRONICS",
+          "RESTAURANT",
+          "TRAVEL",
+          "GAS",
+          "ONLINE_SHOPPING",
+          "ATM_WITHDRAWAL",
+          "TRANSFER",
+          "ENTERTAINMENT",
+          "HEALTHCARE"
+        ]
+      },
+      "doc": "Transaction category"
+    },
+    {
+      "name": "location",
+      "type": "string",
+      "doc": "Transaction location (city, country)"
+    },
+    {
+      "name": "card_type",
+      "type": {
+        "type": "enum",
+        "name": "CardType",
+        "symbols": ["VISA", "MASTERCARD", "AMEX", "DISCOVER"]
+      },
+      "doc": "Card type used"
+    },
+    {
+      "name": "is_online",
+      "type": "boolean",
+      "doc": "Whether the transaction was online"
+    },
+    {
+      "name": "timestamp",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-millis"
+      },
+      "doc": "Transaction timestamp in milliseconds"
+    }
+  ]
+}

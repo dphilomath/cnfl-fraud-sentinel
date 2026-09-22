@@ -1,0 +1,15 @@
+{
+  "name": "datagen-transactions",
+  "config": {
+    "connector.class": "DatagenSource",
+    "name": "datagen-transactions",
+    "kafka.auth.mode": "KAFKA_API_KEY",
+    "kafka.api.key": "KJQXVLTGPZWLTTJR",
+    "kafka.api.secret": "cfltASvl+pG9t8Tc18BECwWCeiLiQ9IE7TXRSHcVi5fd9ZUT8q3QMsHHbi+/x6lw",
+    "kafka.topic": "transactions_raw",
+    "output.data.format": "AVRO",
+    "schema.string": "{\n  \"type\": \"record\",\n  \"name\": \"Transaction\",\n  \"namespace\": \"io.confluent.devday.fraud\",\n  \"fields\": [\n    {\n      \"name\": \"transaction_id\",\n      \"type\": \"string\",\n      \"doc\": \"Unique identifier for the transaction\"\n    },\n    {\n      \"name\": \"user_id\",\n      \"type\": \"string\",\n      \"doc\": \"Unique identifier for the user\"\n    },\n    {\n      \"name\": \"amount\",\n      \"type\": \"double\",\n      \"doc\": \"Transaction amount in USD\"\n    },\n    {\n      \"name\": \"merchant\",\n      \"type\": \"string\",\n      \"doc\": \"Merchant name\"\n    },\n    {\n      \"name\": \"category\",\n      \"type\": {\n        \"type\": \"enum\",\n        \"name\": \"TransactionCategory\",\n        \"symbols\": [\n          \"GROCERY\",\n          \"ELECTRONICS\",\n          \"RESTAURANT\",\n          \"TRAVEL\",\n          \"GAS\",\n          \"ONLINE_SHOPPING\",\n          \"ATM_WITHDRAWAL\",\n          \"TRANSFER\",\n          \"ENTERTAINMENT\",\n          \"HEALTHCARE\"\n        ]\n      },\n      \"doc\": \"Transaction category\"\n    },\n    {\n      \"name\": \"location\",\n      \"type\": \"string\",\n      \"doc\": \"Transaction location (city, country)\"\n    },\n    {\n      \"name\": \"card_type\",\n      \"type\": {\n        \"type\": \"enum\",\n        \"name\": \"CardType\",\n        \"symbols\": [\"VISA\", \"MASTERCARD\", \"AMEX\", \"DISCOVER\"]\n      },\n      \"doc\": \"Card type used\"\n    },\n    {\n      \"name\": \"is_online\",\n      \"type\": \"boolean\",\n      \"doc\": \"Whether the transaction was online\"\n    },\n    {\n      \"name\": \"timestamp\",\n      \"type\": {\n        \"type\": \"long\",\n        \"logicalType\": \"timestamp-millis\"\n      },\n      \"doc\": \"Transaction timestamp in milliseconds\"\n    }\n  ]\n}\n",
+    "max.interval": "1000",
+    "tasks.max": "1"
+  }
+}

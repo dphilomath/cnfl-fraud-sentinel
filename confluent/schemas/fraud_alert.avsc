@@ -1,0 +1,89 @@
+{
+  "type": "record",
+  "name": "FraudAlert",
+  "namespace": "io.confluent.devday.fraud",
+  "fields": [
+    {
+      "name": "alert_id",
+      "type": "string",
+      "doc": "Unique identifier for the fraud alert"
+    },
+    {
+      "name": "transaction_id",
+      "type": "string",
+      "doc": "Reference to the original transaction"
+    },
+    {
+      "name": "user_id",
+      "type": "string",
+      "doc": "User associated with the alert"
+    },
+    {
+      "name": "amount",
+      "type": "double",
+      "doc": "Transaction amount that triggered the alert"
+    },
+    {
+      "name": "merchant",
+      "type": "string",
+      "doc": "Merchant involved"
+    },
+    {
+      "name": "category",
+      "type": "string",
+      "doc": "Transaction category"
+    },
+    {
+      "name": "location",
+      "type": "string",
+      "doc": "Transaction location"
+    },
+    {
+      "name": "risk_level",
+      "type": {
+        "type": "enum",
+        "name": "RiskLevel",
+        "symbols": ["LOW", "MEDIUM", "HIGH", "CRITICAL"]
+      },
+      "doc": "Assessed risk level"
+    },
+    {
+      "name": "anomaly_type",
+      "type": {
+        "type": "enum",
+        "name": "AnomalyType",
+        "symbols": [
+          "HIGH_AMOUNT",
+          "HIGH_VELOCITY",
+          "THRESHOLD_BREACH",
+          "LOCATION_ANOMALY",
+          "STATISTICAL_ANOMALY"
+        ]
+      },
+      "doc": "Type of anomaly detected"
+    },
+    {
+      "name": "risk_score",
+      "type": "double",
+      "doc": "Numerical risk score (0-100)"
+    },
+    {
+      "name": "avg_user_amount",
+      "type": "double",
+      "doc": "User's average transaction amount in the current window"
+    },
+    {
+      "name": "user_txn_count",
+      "type": "int",
+      "doc": "Number of transactions by this user in the current window"
+    },
+    {
+      "name": "flagged_at",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-millis"
+      },
+      "doc": "Timestamp when the alert was generated"
+    }
+  ]
+}
