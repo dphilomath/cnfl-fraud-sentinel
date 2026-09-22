@@ -72,7 +72,7 @@ class FraudConsumer:
         Main consumption loop. Runs in a background thread.
         Pushes deserialized messages to the async queue.
         """
-        topics = [config.fraud_alerts_topic, config.enriched_topic]
+        topics = [config.fraud_alerts_topic, config.transactions_topic, config.enriched_topic]
         self.consumer.subscribe(topics)
         logger.info(f"Subscribed to topics: {topics}")
 

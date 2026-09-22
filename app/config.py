@@ -6,6 +6,7 @@ Reads from environment variables (.env file).
 import os
 from dataclasses import dataclass, field
 from dotenv import load_dotenv
+import certifi
 
 load_dotenv()
 
@@ -55,6 +56,7 @@ class ConfluentConfig:
             "group.id": self.consumer_group,
             "auto.offset.reset": "latest",
             "enable.auto.commit": True,
+            "ssl.ca.location": certifi.where(),
         }
 
     def get_schema_registry_config(self) -> dict:
