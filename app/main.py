@@ -314,18 +314,30 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
+
 # Serve static dashboard files
 DASHBOARD_DIR = Path(__file__).parent.parent / "dashboard"
 app.mount("/static", StaticFiles(directory=str(DASHBOARD_DIR)), name="static")
+app.mount("/fraud/static", StaticFiles(directory=str(DASHBOARD_DIR)), name="fraud_static")
 
 
 @app.get("/")
+@app.get("/fraud/")
 async def serve_dashboard():
     """Serve the main dashboard page."""
     return FileResponse(str(DASHBOARD_DIR / "index.html"))
 
 
+@app.get("/fraud")
+async def redirect_fraud():
+    """Ensure /fraud redirects to trailing slash so relative paths resolve."""
+    return RedirectResponse(url="/fraud/")
+
+
 @app.websocket("/ws")
+@app.websocket("/fraud/ws")
 async def websocket_endpoint(ws: WebSocket):
     """WebSocket endpoint for real-time fraud alerts."""
     await ws.accept()
@@ -351,6 +363,7 @@ async def websocket_endpoint(ws: WebSocket):
 
 
 @app.get("/api/stats")
+@app.get("/fraud/api/stats")
 async def get_stats():
     """Get current dashboard statistics."""
     return {
@@ -366,6 +379,7 @@ async def get_stats():
 
 
 @app.get("/api/health")
+@app.get("/fraud/api/health")
 async def health_check():
     """Health check endpoint."""
     return {

@@ -525,7 +525,9 @@ function addTransactionToTable(message) {
 // ════════════════════════════════════════════════════════
 function connectWebSocket() {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws`;
+    const cleanPath = window.location.pathname.replace(/\/+$/, '');
+    const wsPath = cleanPath ? `${cleanPath}/ws` : '/ws';
+    const wsUrl = `${protocol}//${window.location.host}${wsPath}`;
 
     state.ws = new WebSocket(wsUrl);
 
